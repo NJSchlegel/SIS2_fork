@@ -380,6 +380,7 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
   type(unit_scale_type),   pointer :: US => NULL()
 
   integer :: i, j, k, m, n, i2, j2, k2, isc, iec, jsc, jec, i_off, j_off
+  integer :: isd, ied, jsd, jed
 
   if (.not.associated(Ice%fCS)) call SIS_error(FATAL, &
       "The pointer to Ice%fCS must be associated in unpack_land_ice_boundary.")
@@ -392,6 +393,7 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
   US => Ice%fCS%US
 
   isc = G%isc ; iec = G%iec ; jsc = G%jsc ; jec = G%jec
+  isd = G%isd ; ied = G%ied ; jsd = G%jsd ; jed = G%jed
 
   ! Store liquid runoff and other fluxes from the land to the ice or ocean.
   i_off = LBOUND(LIB%runoff,1) - G%isc ; j_off = LBOUND(LIB%runoff,2) - G%jsc
@@ -411,6 +413,17 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
     FIA%runoff(i,j)  = 0.0 ; FIA%calving(i,j) = 0.0
     FIA%runoff_hflx(i,j)  = 0.0 ; FIA%calving_hflx(i,j) = 0.0
   endif ; enddo ; enddo
+
+  if (LIB%do_IS .and. .not. ASSOCIATED(LIB%IS_adot_sg)) call SIS_error(FATAL,'LIB%IS_adot_sg not allocated')
+
+  !if (LIB%do_IS .and. .not. ALLOCATED(FIA%adot)) allocate(FIA%adot(isd:ied, jsd:jed), source=0.0)
+
+  if (LIB%do_IS .and. ALLOCATED(FIA%adot)) then
+    do j=jsc,jec ; do i=isc,iec
+     i2 = i+i_off ; j2 = j+j_off
+     FIA%adot(i,j)  = US%kg_m2s_to_RZ_T * LIB%IS_adot_sg(i2,j2)
+    enddo ; enddo
+  endif
 
   if (Ice%fCS%debug) then
     call FIA_chksum("End of unpack_land_ice_boundary", FIA, G, Ice%fCS%US)
@@ -660,6 +673,12 @@ subroutine set_ocean_top_fluxes(Ice, IST, IOF, FIA, OSS, G, US, IG, sCS)
     do j=jsc,jec ; do i=isc,iec
       i2 = i+i_off ; j2 = j+j_off! Use these to correct for indexing differences.
       Ice%lprec(i2,j2) = Ice%lprec(i2,j2) + US%RZ_T_to_kg_m2s*IOF%melt_nudge(i,j)
+    enddo ; enddo
+  endif
+  if (allocated(FIA%adot)) then
+    do j=jsc,jec ; do i=isc,iec
+      i2 = i+i_off ; j2 = j+j_off! Use these to correct for indexing differences.
+      Ice%adot(i2,j2) = US%RZ_T_to_kg_m2s*FIA%adot(i,j)
     enddo ; enddo
   endif
 
@@ -1777,6 +1796,8 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
   character(len=200) :: hlim_string
   type(ice_OBC_type), pointer :: OBC_in => NULL()
 
+  logical :: do_IS = .false.
+
   if (associated(Ice%sCS)) then ; if (associated(Ice%sCS%IST)) then
     call SIS_error(WARNING, "ice_model_init called with an associated "// &
                     "Ice%sCS%Ice_state structure. Model is already initialized.")
@@ -1942,6 +1963,9 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
     call get_param(param_file, mdl, "PASS_ICEBERG_AREA_TO_OCEAN", pass_iceberg_area_to_ocean, &
                  "If true, iceberg area is passed through coupler", default=.false.)
   else ; pass_iceberg_area_to_ocean = .false. ; endif
+
+  call get_param(param_file, mdl, "ENABLE_ICE_SHEET_ADOT_COUPLING", do_IS, &
+                 "If true, ice sheet surface mass flux is passed through the coupler", default=.false.)
 
   call get_param(param_file, mdl, "ADD_DIURNAL_SW", add_diurnal_sw, &
                  "If true, add a synthetic diurnal cycle to the shortwave radiation.", &
@@ -2127,7 +2151,7 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
                               do_iceberg_fields=Ice%sCS%do_icebergs, do_transmute=transmute_ice)
     Ice%sCS%IOF%slp2ocean = slp2ocean
     Ice%sCS%IOF%flux_uv_stagger = Ice%flux_uv_stagger
-    call alloc_fast_ice_avg(Ice%sCS%FIA, sHI, sIG, interp_fluxes, gas_fluxes)
+    call alloc_fast_ice_avg(Ice%sCS%FIA, sHI, sIG, interp_fluxes, gas_fluxes, ice_sheet_enabled=do_IS)
 
     if (Ice%sCS%redo_fast_update) then
       call alloc_total_sfc_flux(Ice%sCS%TSF, sHI, gas_fluxes)
@@ -2282,7 +2306,7 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
                             omit_velocities=.true., omit_tsurf=Eulerian_tsurf)
     endif
     if (.not.single_IST) then
-      call alloc_fast_ice_avg(Ice%fCS%FIA, fHI, Ice%fCS%IG, interp_fluxes, gas_fluxes)
+      call alloc_fast_ice_avg(Ice%fCS%FIA, fHI, Ice%fCS%IG, interp_fluxes, gas_fluxes, ice_sheet_enabled=do_IS)
 
       call alloc_simple_OSS(Ice%fCS%sOSS, fHI, gas_fields_ocn)
     endif

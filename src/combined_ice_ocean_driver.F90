@@ -306,6 +306,7 @@ subroutine direct_flux_ice_to_IOB(Time, Ice, IOB, do_thermo)
     if (ASSOCIATED(IOB%fprec)) IOB%fprec(:,:) = Ice%fprec(:,:)
     if (ASSOCIATED(IOB%runoff)) IOB%runoff(:,:) = Ice%runoff(:,:)
     if (ASSOCIATED(IOB%calving)) IOB%calving(:,:) = Ice%calving
+    if (ASSOCIATED(IOB%shelf_sfc_mass_flux)) IOB%shelf_sfc_mass_flux(:,:) = Ice%adot(:,:)
     if (ASSOCIATED(IOB%runoff_hflx)) IOB%runoff_hflx(:,:) = Ice%runoff_hflx(:,:)
     if (ASSOCIATED(IOB%calving_hflx)) IOB%calving_hflx(:,:) = Ice%calving_hflx(:,:)
     if (ASSOCIATED(IOB%q_flux)) IOB%q_flux(:,:) = Ice%flux_q(:,:)
@@ -343,6 +344,8 @@ subroutine direct_flux_ice_to_IOB(Time, Ice, IOB, do_thermo)
     call data_override('OCN', 'area_berg',  IOB%area_berg , Time)
   if (ASSOCIATED(IOB%mass_berg) ) &
     call data_override('OCN', 'mass_berg',  IOB%mass_berg , Time)
+  if (ASSOCIATED(IOB%shelf_sfc_mass_flux) ) &
+    call data_override('OCN', 'shelf_sfc_mass_flux',  IOB%shelf_sfc_mass_flux , Time)
 
   ! Override and output extra fluxes of tracers or gasses
   if (do_therm) then
