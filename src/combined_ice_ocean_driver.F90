@@ -293,6 +293,7 @@ subroutine direct_flux_ice_to_IOB(Time, Ice, IOB, do_thermo)
   if (ASSOCIATED(IOB%ustar_berg)) IOB%ustar_berg(:,:) = Ice%ustar_berg(:,:)
   if (ASSOCIATED(IOB%area_berg)) IOB%area_berg(:,:) = Ice%area_berg(:,:)
   if (ASSOCIATED(IOB%mass_berg)) IOB%mass_berg(:,:) = Ice%mass_berg(:,:)
+  if (ASSOCIATED(IOB%shelf_sfc_mass_flux)) IOB%shelf_sfc_mass_flux(:,:) = Ice%adot(:,:)
 
   if (do_therm) then
     if (ASSOCIATED(IOB%t_flux)) IOB%t_flux(:,:) = Ice%flux_t(:,:)
@@ -306,7 +307,6 @@ subroutine direct_flux_ice_to_IOB(Time, Ice, IOB, do_thermo)
     if (ASSOCIATED(IOB%fprec)) IOB%fprec(:,:) = Ice%fprec(:,:)
     if (ASSOCIATED(IOB%runoff)) IOB%runoff(:,:) = Ice%runoff(:,:)
     if (ASSOCIATED(IOB%calving)) IOB%calving(:,:) = Ice%calving
-    if (ASSOCIATED(IOB%shelf_sfc_mass_flux)) IOB%shelf_sfc_mass_flux(:,:) = Ice%adot(:,:)
     if (ASSOCIATED(IOB%runoff_hflx)) IOB%runoff_hflx(:,:) = Ice%runoff_hflx(:,:)
     if (ASSOCIATED(IOB%calving_hflx)) IOB%calving_hflx(:,:) = Ice%calving_hflx(:,:)
     if (ASSOCIATED(IOB%q_flux)) IOB%q_flux(:,:) = Ice%flux_q(:,:)

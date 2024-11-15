@@ -40,6 +40,7 @@ use MOM_time_manager,  only : time_type, time_type_to_real, real_to_time
 use MOM_time_manager,  only : operator(+), operator(-)
 use MOM_time_manager,  only : operator(>), operator(*), operator(/), operator(/=)
 use MOM_unit_scaling,  only : unit_scale_type, unit_scaling_init, unit_scaling_end
+use MOM_error_handler, only : stdout, is_root_pe
 
 use astronomy_mod, only : astronomy_init, astronomy_end
 use astronomy_mod, only : universal_time, orbital_time, diurnal_solar, daily_mean_solar
@@ -382,6 +383,12 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
   integer :: i, j, k, m, n, i2, j2, k2, isc, iec, jsc, jec, i_off, j_off
   integer :: isd, ied, jsd, jed
 
+  logical :: root    ! True only on the root PE
+  integer :: outunit ! The output unit to write to
+
+  outunit = stdout()
+  root = is_root_pe()
+
   if (.not.associated(Ice%fCS)) call SIS_error(FATAL, &
       "The pointer to Ice%fCS must be associated in unpack_land_ice_boundary.")
   if (.not.associated(Ice%fCS%FIA)) call SIS_error(FATAL, &
@@ -416,9 +423,8 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
 
   if (LIB%do_IS .and. .not. ASSOCIATED(LIB%IS_adot_sg)) call SIS_error(FATAL,'LIB%IS_adot_sg not allocated')
 
-  !if (LIB%do_IS .and. .not. ALLOCATED(FIA%adot)) allocate(FIA%adot(isd:ied, jsd:jed), source=0.0)
-
   if (LIB%do_IS .and. ALLOCATED(FIA%adot)) then
+    if (root) write(outunit,*) 'ICE SHEET SURFACE FLUX EXCHANGE is enabled'
     do j=jsc,jec ; do i=isc,iec
      i2 = i+i_off ; j2 = j+j_off
      FIA%adot(i,j)  = US%kg_m2s_to_RZ_T * LIB%IS_adot_sg(i2,j2)
@@ -1641,7 +1647,7 @@ end subroutine add_diurnal_sw
 !> ice_model_init - initializes ice model data, parameters and diagnostics. It
 !! might operate on the fast ice processors, the slow ice processors or both.
 subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, &
-                          Verona_coupler, Concurrent_ice, gas_fluxes, gas_fields_ocn )
+                          Verona_coupler, Concurrent_ice, gas_fluxes, gas_fields_ocn, ice_sheet_enabled)
 
   type(ice_data_type), intent(inout) :: Ice            !< The ice data type that is being initialized.
   type(time_type)    , intent(in)    :: Time_Init      !< The starting time of the model integration
@@ -1667,6 +1673,7 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
                                               !! in the calculation of additional gas or other
                                               !! tracer fluxes, and can be used to spawn related
                                               !! internal variables in the ice model.
+  logical, optional, intent(in)       :: ice_sheet_enabled
 
   ! This include declares and sets the variable "version".
 # include "version_variable.h"
@@ -1707,6 +1714,8 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
   ! Parameters that properly belong exclusively to ice_thm.
   real :: massless_ice_enth, massless_snow_enth ! Enthalpy fill values [Q ~> J kg-1]
   real :: massless_ice_salin  ! A salinity fill value [S ~> ppt]
+
+  logical :: do_IS
 
   real, allocatable, dimension(:,:) :: &
     h_ice_input, dummy   ! Temporary arrays.
@@ -1796,13 +1805,14 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
   character(len=200) :: hlim_string
   type(ice_OBC_type), pointer :: OBC_in => NULL()
 
-  logical :: do_IS = .false.
-
   if (associated(Ice%sCS)) then ; if (associated(Ice%sCS%IST)) then
     call SIS_error(WARNING, "ice_model_init called with an associated "// &
                     "Ice%sCS%Ice_state structure. Model is already initialized.")
     return
   endif ; endif
+
+  do_IS=.false.
+  if (present(ice_sheet_enabled)) do_IS=ice_sheet_enabled
 
   ! For now, both fast and slow processes occur on all sea-ice PEs.
   fast_ice_PE = .true. ; slow_ice_PE = .true.
@@ -1963,9 +1973,6 @@ subroutine ice_model_init(Ice, Time_Init, Time, Time_step_fast, Time_step_slow, 
     call get_param(param_file, mdl, "PASS_ICEBERG_AREA_TO_OCEAN", pass_iceberg_area_to_ocean, &
                  "If true, iceberg area is passed through coupler", default=.false.)
   else ; pass_iceberg_area_to_ocean = .false. ; endif
-
-  call get_param(param_file, mdl, "ENABLE_ICE_SHEET_ADOT_COUPLING", do_IS, &
-                 "If true, ice sheet surface mass flux is passed through the coupler", default=.false.)
 
   call get_param(param_file, mdl, "ADD_DIURNAL_SW", add_diurnal_sw, &
                  "If true, add a synthetic diurnal cycle to the shortwave radiation.", &
