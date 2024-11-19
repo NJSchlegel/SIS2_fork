@@ -1600,7 +1600,7 @@ subroutine redistribute_FIA_to_FIA(FIA_in, FIA_out, domain_in, domain_out, G_out
                            FIA_out%runoff, complete=.false.)
     call redistribute_data(domain_in, null_ptr2D, domain_out, &
                            FIA_out%calving, complete=.false.)
-    if (allocated(FIA_in%adot)) call redistribute_data(domain_in, null_ptr2D, &
+    if (allocated(FIA_out%adot)) call redistribute_data(domain_in, null_ptr2D, &
          domain_out, FIA_out%adot, complete=.false.)
     call redistribute_data(domain_in, null_ptr2D, domain_out, &
                            FIA_out%runoff_hflx, complete=.false.)
