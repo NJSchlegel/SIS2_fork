@@ -409,9 +409,14 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
   do j=jsc,jec ; do i=isc,iec ; if (G%mask2dT(i,j) > 0.0) then
     i2 = i+i_off ; j2 = j+j_off
     FIA%runoff(i,j)  = US%kg_m2s_to_RZ_T*LIB%runoff(i2,j2)
-    FIA%calving(i,j) = US%kg_m2s_to_RZ_T*LIB%calving(i2,j2)
     FIA%runoff_hflx(i,j)  = US%W_m2_to_QRZ_T*LIB%runoff_hflx(i2,j2)
-    FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*LIB%calving_hflx(i2,j2)
+    if (.not. LIB%do_calve) then
+       FIA%calving(i,j) = US%kg_m2s_to_RZ_T*LIB%calving(i2,j2)
+       FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*LIB%calving_hflx(i2,j2)
+    else
+       FIA%calving(i,j) = 0.0
+       FIA%calving_hflx(i,j) = 0.0
+    endif
   else
     ! This is a land point from the perspective of the sea-ice.
     ! At some point it might make sense to check for non-zero fluxes, which
@@ -428,6 +433,8 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
     do j=jsc,jec ; do i=isc,iec
      i2 = i+i_off ; j2 = j+j_off
      FIA%adot(i,j)  = US%kg_m2s_to_RZ_T * LIB%IS_adot_sg(i2,j2)
+     FIA%calving(i,j) = 0.0
+     FIA%calving_hflx(i,j) = 0.0
     enddo ; enddo
   endif
 

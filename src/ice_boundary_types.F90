@@ -119,6 +119,7 @@ type land_ice_boundary_type
   integer   :: xtype     !< A flag indicating the exchange type, which may be set to
                          !! REGRID, REDIST or DIRECT and is used by coupler
   logical   :: do_IS = .false.
+  logical   :: do_calve = .false.
 end type land_ice_boundary_type
 
 contains
