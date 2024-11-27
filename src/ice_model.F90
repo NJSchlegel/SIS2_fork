@@ -402,6 +402,9 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
   isc = G%isc ; iec = G%iec ; jsc = G%jsc ; jec = G%jec
   isd = G%isd ; ied = G%ied ; jsd = G%jsd ; jed = G%jed
 
+  if (LIB%do_IS .and. .not. ASSOCIATED(LIB%IS_adot_sg)) call SIS_error(FATAL,'LIB%IS_adot_sg not allocated')
+  if (LIB%do_IS .and. .not. ASSOCIATED(LIB%IS_mask_sg)) call SIS_error(FATAL,'LIB%IS_mask_sg not allocated')
+
   ! Store liquid runoff and other fluxes from the land to the ice or ocean.
   i_off = LBOUND(LIB%runoff,1) - G%isc ; j_off = LBOUND(LIB%runoff,2) - G%jsc
   !$OMP parallel do default(none) shared(isc,iec,jsc,jec,FIA,LIB,i_off,j_off,G,US) &
@@ -410,13 +413,8 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
     i2 = i+i_off ; j2 = j+j_off
     FIA%runoff(i,j)  = US%kg_m2s_to_RZ_T*LIB%runoff(i2,j2)
     FIA%runoff_hflx(i,j)  = US%W_m2_to_QRZ_T*LIB%runoff_hflx(i2,j2)
-    if (.not. LIB%do_calve) then
-       FIA%calving(i,j) = US%kg_m2s_to_RZ_T*LIB%calving(i2,j2)
-       FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*LIB%calving_hflx(i2,j2)
-    else
-       FIA%calving(i,j) = 0.0
-       FIA%calving_hflx(i,j) = 0.0
-    endif
+    FIA%calving(i,j) = US%kg_m2s_to_RZ_T*LIB%calving(i2,j2)
+    FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*LIB%calving_hflx(i2,j2)
   else
     ! This is a land point from the perspective of the sea-ice.
     ! At some point it might make sense to check for non-zero fluxes, which
@@ -426,15 +424,11 @@ subroutine unpack_land_ice_boundary(Ice, LIB)
     FIA%runoff_hflx(i,j)  = 0.0 ; FIA%calving_hflx(i,j) = 0.0
   endif ; enddo ; enddo
 
-  if (LIB%do_IS .and. .not. ASSOCIATED(LIB%IS_adot_sg)) call SIS_error(FATAL,'LIB%IS_adot_sg not allocated')
-
   if (LIB%do_IS .and. ALLOCATED(FIA%adot)) then
     if (root) write(outunit,*) 'ICE SHEET SURFACE FLUX EXCHANGE is enabled'
     do j=jsc,jec ; do i=isc,iec
-     i2 = i+i_off ; j2 = j+j_off
-     FIA%adot(i,j)  = US%kg_m2s_to_RZ_T * LIB%IS_adot_sg(i2,j2)
-     FIA%calving(i,j) = 0.0
-     FIA%calving_hflx(i,j) = 0.0
+      i2 = i+i_off ; j2 = j+j_off
+      FIA%adot(i,j)  = US%kg_m2s_to_RZ_T * LIB%IS_adot_sg(i2,j2)
     enddo ; enddo
   endif
 
@@ -473,12 +467,11 @@ subroutine unpack_ocean_ice_boundary_calved_shelf_bergs(Ice, OIB)
   !$OMP parallel do default(none) shared(isc,iec,jsc,jec,FIA,OIB,i_off,j_off,G,US) &
   !$OMP                          private(i2,j2)
   do j=jsc,jec ; do i=isc,iec ; if (G%mask2dT(i,j) > 0.0) then
+    if (FIA%calving(i,j)>0.0 .and. OIB%calving(i2,j2)>0.0) &
+            call SIS_error(FATAL,"Overlap in calving from snow discharge and ice shelf!")
     i2 = i+i_off ; j2 = j+j_off
-    if (OIB%calving(i2,j2)>0.0) then
-      if (FIA%calving(i,j)>0.0) call SIS_error(FATAL,"Overlap in calving from snow discharge and ice shelf!")
-      FIA%calving(i,j) = US%kg_m2s_to_RZ_T*OIB%calving(i2,j2)
-      FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*OIB%calving_hflx(i2,j2)
-    endif
+    FIA%calving(i,j) = US%kg_m2s_to_RZ_T*OIB%calving(i2,j2)
+    FIA%calving_hflx(i,j) = US%W_m2_to_QRZ_T*OIB%calving_hflx(i2,j2)
   endif ; enddo ; enddo
 
   if (Ice%sCS%debug) then
